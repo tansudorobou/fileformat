@@ -1,0 +1,22 @@
+{
+    "rule": "{department}.{period}.{type}.{title}",
+    "selection": {
+        "department":[
+            "AP",
+            "BS",
+            "CFPM"
+        ],
+        "period":[
+            "68",
+            "69"
+        ],
+        "type":[
+            "新規",
+            "移管",
+            "工程変更",
+            "試作",
+            "量産",
+            "受注"
+        ]
+    }
+}
