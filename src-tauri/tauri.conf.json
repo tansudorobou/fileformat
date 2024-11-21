@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "file-format",
+  "productName": "file-craft",
   "version": "0.1.0",
-  "identifier": "file-format",
+  "identifier": "file-craft",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
@@ -12,9 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "file-format",
+        "title": "FileCraft",
         "width": 800,
         "height": 600,
+        "minWidth": 240,
         "dragDropEnabled": false
       }
     ],
@@ -31,9 +32,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "resources":[
-      "resources/config/configfile.json"
     ]
   }
 }

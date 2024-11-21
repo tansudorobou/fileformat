@@ -4,93 +4,112 @@
 // use tauri::Manager;
 use dirs;
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
-fn rename_file(file_path: String, selection: Value) -> Result<(), String> {
-    // ルールを取得
-    let rule = selection["rule"].as_str().ok_or("Invalid rule format")?;
-
-    // 正規表現で{}で囲まれた部分を抽出
-    let re = Regex::new(r"\{(\w+)\}").map_err(|e| e.to_string())?;
-    let mut new_name = rule.to_string();
-
-    for cap in re.captures_iter(rule) {
-        let key = &cap[1];
-        let value = selection[key]
-            .as_str()
-            .ok_or(format!("Invalid format for key: {}", key))?;
-        new_name = new_name.replace(&format!("{{{}}}", key), value);
-    }
-
-    new_name = new_name + "." + selection["extends"].as_str().ok_or("Invalid rule format")?;
-
-    let path = Path::new(&file_path);
-    let new_path = path.with_file_name(new_name);
-    fs::rename(&path, &new_path).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
 #[derive(Serialize)]
 struct FileFormatResponse {
     format: Value,
-    name: String,
-    extension: String,
     keys: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+enum SelectionValue {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ConfigJsonFormat {
+    rule: String,
+    selection: Option<HashMap<String, SelectionValue>>,
 }
 
 #[tauri::command]
 fn get_file_format(file_path: String) -> Result<Value, String> {
+    // ファイルパスの取得
     let path = Path::new(&file_path);
-    let dir = path.parent().ok_or("Invalid file path")?;
-    let resource_path = dir.join("fileformat.json");
 
-    let file = std::fs::File::open(&resource_path).map_err(|e| e.to_string())?;
-    let config: Value = serde_json::from_reader(file).map_err(|e| e.to_string())?;
+    // ファイルの拡張子チェック
+    if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+        return Err("ファイルの拡張子が正しくありません".to_string());
+    }
 
-    let file_name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .ok_or("Invalid file name")?
-        .to_string();
-    let extension = path
-        .extension()
-        .and_then(|s| s.to_str())
-        .ok_or("Invalid file extension")?
-        .to_string();
+    // ファイルの読み込み
+    let file = std::fs::File::open(&path).map_err(|_| "ファイルが指定されてません".to_string())?;
+
+    // ファイルのデシリアライズ
+    let config: ConfigJsonFormat = serde_json::from_reader(file)
+        .map_err(|_| "設定ファイルの読み込みに失敗しました".to_string())?;
 
     // ruleからキーを抽出
-    let rule = config["rule"].as_str().ok_or("Invalid rule format")?;
-    let re = Regex::new(r"\{(\w+)\}").map_err(|e| e.to_string())?;
+    let rule = config.rule.as_str();
+
+    // 正規表現で{}で囲まれた部分を抽出
+    let re = Regex::new(r"\{(\w+)\}").map_err(|_| "設定ファイルが正しくありません".to_string())?;
+
+    // キーを抽出
     let keys: Vec<String> = re
         .captures_iter(rule)
         .map(|cap| cap[1].to_string())
         .collect();
 
+    // レスポンスの作成
     let response = FileFormatResponse {
-        format: config,
-        name: file_name,
-        extension,
+        format: serde_json::to_value(config)
+            .map_err(|_| "formatの生成に失敗しました".to_string())?,
         keys,
     };
 
-    Ok(serde_json::to_value(response).map_err(|e| e.to_string())?)
+    // レスポンスを返す
+    Ok(serde_json::to_value(response).map_err(|_| "レスポンスに失敗しました".to_string())?)
 }
 
 #[tauri::command]
-fn save_file(file_name: String, file_data: Vec<u8>) -> Result<(), String> {
-    let desktop_path = dirs::desktop_dir().ok_or("Could not get desktop directory")?;
-    let destination = desktop_path.join(file_name);
-    let mut file = std::fs::File::create(&destination).map_err(|e| e.to_string())?;
+fn save_file(selection: Value, file_data: Vec<u8>) -> Result<(), String> {
+    // ルールを取得
+    let rule = selection["rule"]
+        .as_str()
+        .ok_or("ルールが正しくありません")?;
+
+    // 正規表現で{}で囲まれた部分を抽出
+    let re = Regex::new(r"\{(\w+)\}").map_err(|_| "ルールの抽出に失敗しました".to_string())?;
+    let mut file_name = rule.to_string();
+
+    // キーを抽出して置換
+    for cap in re.captures_iter(rule) {
+        let key = &cap[1];
+        let value = selection[key]
+            .as_str()
+            .ok_or("ルールの値を置換することが出来ませんでした")?;
+        file_name = file_name.replace(&format!("{{{}}}", key), value);
+    }
+
+    // 拡張子を追加
+    file_name = file_name
+        + "."
+        + selection["extension"]
+            .as_str()
+            .ok_or("拡張子が設定されていないようです")?;
+
+    // ユーザーのデスクトップパスを取得
+    let desktop_path = dirs::desktop_dir().ok_or("デスクトップのパスが取得できません")?;
+    let destination = desktop_path.join(&file_name);
+
+    // ファイル名が重複する場合はエラーメッセージを返す
+    if destination.exists() {
+        return Err(format!("このファイルは既に存在します\n{}", file_name));
+    }
+
+    // ファイルの書き込み
+    let mut file = fs::File::create(&destination).map_err(|e| e.to_string())?;
+
+    // ファイルデータの書き込み
     file.write_all(&file_data).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -101,12 +120,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![
-            greet,
-            rename_file,
-            get_file_format,
-            save_file
-        ])
+        .invoke_handler(tauri::generate_handler![get_file_format, save_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
