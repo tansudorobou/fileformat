@@ -8,7 +8,8 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
-    "fs:default",
+    "fs:allow-open",
+    "fs:allow-desktop-write",
     "dialog:default"
   ]
 }
