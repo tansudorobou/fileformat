@@ -13,8 +13,9 @@ import {
 import { DatePicker, DatePickerContent } from "@/components/ui/date-picker"
 import { DateInput } from "@/components/ui/datefield"
 import { FieldGroup, Label } from "@/components/ui/field"
-import { type CalendarDate, parseDate } from "@internationalized/date"
+import { parseDate } from "@internationalized/date"
 import { format, parse } from "date-fns"
+import type { DateValue } from "react-aria-components"
 
 export function Datepicker({
   jsonKey,
@@ -69,7 +70,7 @@ export function Datepicker({
 function stringToISO8601ToCalenderDate({
   value,
   parseFormat,
-}: { value: string; parseFormat: string }): CalendarDate {
+}: { value: string; parseFormat: string }): DateValue {
   return parseDate(format(parse(value, parseFormat, new Date()), "yyyy-MM-dd"))
 }
 
@@ -77,8 +78,9 @@ function calendarDateToFormatDate({
   date,
   parseFormat,
 }: {
-  date: CalendarDate
+  date: DateValue | null
   parseFormat: string
 }): string {
+  if (date === null) return ""
   return format(parse(date.toString(), "yyyy-MM-dd", new Date()), parseFormat)
 }
