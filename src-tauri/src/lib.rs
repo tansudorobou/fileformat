@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Serialize)]
 struct FileFormatResponse {
@@ -30,10 +31,25 @@ struct ConfigJsonFormat {
     selection: Option<HashMap<String, SelectionValue>>,
 }
 
+#[derive(Default, Debug)]
+struct SavedFile {
+    file_path: String,
+}
+
+// ファイルの保存先を保持するMutex
+static SAVED_FILE: OnceLock<Mutex<SavedFile>> = OnceLock::new();
+
 #[tauri::command]
 fn get_file_format(file_path: String) -> Result<Value, String> {
     // ファイルパスの取得
     let path = Path::new(&file_path);
+
+    // SAVED_FILEにファイルパスを保存
+    let mut saved_file = SAVED_FILE
+        .get_or_init(|| Mutex::new(SavedFile::default()))
+        .lock()
+        .unwrap();
+    saved_file.file_path = file_path.clone();
 
     // ファイルの拡張子チェック
     if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
@@ -71,7 +87,7 @@ fn get_file_format(file_path: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
-fn save_file(selection: Value, file_data: Vec<u8>) -> Result<(), String> {
+fn save_file(selection: Value, file_data: Vec<u8>, saved_desktop_flag: bool) -> Result<(), String> {
     // ルールを取得
     let rule = selection["rule"]
         .as_str()
@@ -97,9 +113,28 @@ fn save_file(selection: Value, file_data: Vec<u8>) -> Result<(), String> {
             .as_str()
             .ok_or("拡張子が設定されていないようです")?;
 
-    // ユーザーのデスクトップパスを取得
-    let desktop_path = dirs::desktop_dir().ok_or("デスクトップのパスが取得できません")?;
-    let destination = desktop_path.join(&file_name);
+    // 保存先のパスを設定
+    let destination = if saved_desktop_flag {
+        // ユーザーのデスクトップパスを取得
+        let desktop_path = dirs::desktop_dir().ok_or("デスクトップのパスが取得できません")?;
+        desktop_path.join(&file_name)
+    } else {
+        // ファイルの保存先を取得
+        let saved_file = SAVED_FILE
+            .get_or_init(|| Mutex::new(SavedFile::default()))
+            .lock()
+            .unwrap();
+
+        let file_path = Path::new(&saved_file.file_path);
+        let file_dir = file_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| {
+                // ユーザーのデスクトップパスを取得
+                dirs::desktop_dir().expect("デスクトップのパスが取得できません")
+            });
+        file_dir.join(&file_name)
+    };
 
     // ファイル名が重複する場合はエラーメッセージを返す
     if destination.exists() {

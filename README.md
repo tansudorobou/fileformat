@@ -22,3 +22,15 @@ This template should help get you started developing with Tauri, React and Types
   - #FFF
 - Background Color
   - #16C149
+
+## Read File format rule
+
+```json
+{
+  "rule": "{date}_{type}_{title}",
+  "selection": {
+    "date": "yyyy-MM-dd",
+    "type": ["AA", "BB", "CC"]
+  }
+}
+```

@@ -1,4 +1,9 @@
-import { CaretSortIcon, Cross1Icon } from "@radix-ui/react-icons"
+import {
+  BoxIcon,
+  CaretSortIcon,
+  CheckboxIcon,
+  Cross1Icon,
+} from "@radix-ui/react-icons"
 import { invoke } from "@tauri-apps/api/core"
 import { message, open } from "@tauri-apps/plugin-dialog"
 import { format as fnsFormat } from "date-fns"
@@ -47,11 +52,14 @@ const generateInitialFormData = (keys: string[], format: FileFormat) => {
 
 function hookLoader() {
   // state
+
+  // config: 設定ファイルの内容
   const [config, setConfig] = useState<Config | undefined>(() => {
     const savedConfig = localStorage.getItem("config")
     return savedConfig ? JSON.parse(savedConfig) : undefined
   })
 
+  // formData: ファイル名の入力フォームの内容
   const [formData, setFormData] = useState<{ [key: string]: string }>(() => {
     if (config) {
       return generateInitialFormData(config.keys, config.format)
@@ -59,18 +67,28 @@ function hookLoader() {
     return {}
   })
 
+  // savedFlag: ファイルの保存をデスクトップに保存するようにするかどうか
+  const [savedDesktopFlag, setSavedDesktopFlag] = useState<boolean>(() => {
+    const savedFlag = localStorage.getItem("savedFlag")
+    return savedFlag ? JSON.parse(savedFlag) : true
+  })
+
+  // dropedFile: ドロップされたファイル
   const [dropedFile, setDropedFile] = useState<File | null>(null)
 
+  // fileExtension: ドロップされたファイルの拡張子
   const [fileExtension, setFileExtension] = useState<string | null>(null)
 
   // function
 
+  // ドロップされたファイルをセットする
   const setFile = (file: File) => {
     setDropedFile(file)
     const extension = file.name.split(".").pop()
     setFileExtension(extension || null)
   }
 
+  // ドロップされたファイルをリセットする
   const onDrop = async (e: DropEvent) => {
     const files = e.items.filter(
       (file) => file.kind === "file",
@@ -79,6 +97,7 @@ function hookLoader() {
     setFile(file)
   }
 
+  // フォームの入力内容を更新する
   const handleInputChange = (key: string, value: string) => {
     setFormData((prevData) => ({
       ...prevData,
@@ -86,6 +105,7 @@ function hookLoader() {
     }))
   }
 
+  // 設定ファイルを開いて、内容を取得する
   const openSettingFileDialog = async () => {
     const openOptions = {
       multiple: false,
@@ -121,10 +141,13 @@ function hookLoader() {
 
       setFormData(initialFormData)
     } catch (error) {
-      alert(error)
+      message(String(error), {
+        kind: "error",
+      })
     }
   }
 
+  // ファイルを保存する
   const handleSaveFile = async () => {
     if (dropedFile) {
       const arrayBuffer = await dropedFile.arrayBuffer()
@@ -134,7 +157,10 @@ function hookLoader() {
         (value) => value !== "",
       )
       if (!allFieldsFilled) {
-        alert("全ての項目を入力してください")
+        message("全てのフォームを入力してください", {
+          title: "未入力なフォームがあります",
+          kind: "info",
+        })
         return
       }
 
@@ -148,6 +174,7 @@ function hookLoader() {
         await invoke("save_file", {
           selection,
           fileData: Array.from(fileData),
+          savedDesktopFlag,
         })
         resetFile()
 
@@ -207,6 +234,8 @@ function hookLoader() {
     resetConfig,
     resetFile,
     handleEnterKeyPress,
+    savedDesktopFlag,
+    setSavedDesktopFlag,
   }
 }
 
@@ -223,10 +252,22 @@ export default function App() {
     resetConfig,
     resetFile,
     handleEnterKeyPress,
+    savedDesktopFlag,
+    setSavedDesktopFlag,
   } = hookLoader()
 
   return (
-    <main className="container mx-auto p-4">
+    <main className="container mx-auto px-4 p-2">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="flex items-center gap-2 bg-gray-50 text-gray-400 hover:bg-gray-100 rounded px-2"
+          onClick={() => setSavedDesktopFlag(!savedDesktopFlag)}
+        >
+          <div>常にデスクトップに保存</div>
+          {savedDesktopFlag ? <CheckboxIcon /> : <BoxIcon />}
+        </button>
+      </div>
       <DropZone onDrop={onDrop}>
         {!dropedFile && (
           <Text

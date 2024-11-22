@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "FileCraft",
-        "width": 800,
+        "width": 640,
         "height": 600,
         "minWidth": 240,
         "dragDropEnabled": false
