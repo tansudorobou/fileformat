@@ -7,6 +7,7 @@ import {
 import { invoke } from "@tauri-apps/api/core"
 import { message, open } from "@tauri-apps/plugin-dialog"
 import { format as fnsFormat } from "date-fns"
+import { se } from "date-fns/locale"
 import { useState } from "react"
 import type { DropEvent, FileDropItem } from "react-aria"
 import { Text } from "react-aria-components"
@@ -107,6 +108,8 @@ function hookLoader() {
 
   // 設定ファイルを開いて、内容を取得する
   const openSettingFileDialog = async () => {
+    setOnClicked(true)
+
     const openOptions = {
       multiple: false,
       directory: false,
@@ -140,7 +143,9 @@ function hookLoader() {
       const initialFormData = generateInitialFormData(keys, format)
 
       setFormData(initialFormData)
+      setOnClicked(false)
     } catch (error) {
+      setOnClicked(false)
       message(String(error), {
         kind: "error",
       })
@@ -149,6 +154,8 @@ function hookLoader() {
 
   // ファイルを保存する
   const handleSaveFile = async () => {
+    setOnClicked(true)
+
     if (dropedFile) {
       const arrayBuffer = await dropedFile.arrayBuffer()
       const fileData = new Uint8Array(arrayBuffer)
@@ -176,13 +183,16 @@ function hookLoader() {
           fileData: Array.from(fileData),
           savedDesktopFlag,
         })
+
         resetFile()
+        setOnClicked(false)
 
         message("ファイルの保存が完了しました", {
           title: "ファイルの保存",
           kind: "info",
         })
       } catch (error) {
+        setOnClicked(false)
         message(String(error), {
           title: "ファイルの保存に失敗しました",
           kind: "error",
@@ -221,11 +231,14 @@ function hookLoader() {
     setConfig(undefined)
   }
 
+  const [onClicked, setOnClicked] = useState(false)
+
   return {
     config,
     formData,
     dropedFile,
     fileExtension,
+    onClicked,
     onDrop,
     handleInputChange,
     openSettingFileDialog,
@@ -244,6 +257,7 @@ export default function App() {
     config,
     formData,
     dropedFile,
+    onClicked,
     onDrop,
     handleInputChange,
     openSettingFileDialog,
@@ -263,6 +277,7 @@ export default function App() {
           type="button"
           className="flex items-center gap-2 bg-gray-50 text-gray-400 hover:bg-gray-100 rounded px-2"
           onClick={() => setSavedDesktopFlag(!savedDesktopFlag)}
+          disabled={onClicked}
         >
           <div>常にデスクトップに保存</div>
           {savedDesktopFlag ? <CheckboxIcon /> : <BoxIcon />}
@@ -287,7 +302,12 @@ export default function App() {
             >
               {dropedFile?.name}
             </Text>
-            <Button type="button" variant="icon" onPress={resetFile}>
+            <Button
+              type="button"
+              variant="icon"
+              onPress={resetFile}
+              isDisabled={onClicked}
+            >
               <Cross1Icon />
             </Button>
           </div>
@@ -312,6 +332,7 @@ export default function App() {
                 type="button"
                 onPress={resetConfig}
                 variant={"destructive"}
+                isDisabled={onClicked}
               >
                 リセット
               </Button>
@@ -320,6 +341,7 @@ export default function App() {
                   type="button"
                   onPress={handleSaveFile}
                   variant={"outline"}
+                  isDisabled={onClicked}
                 >
                   ファイルコピー
                 </Button>
@@ -333,6 +355,7 @@ export default function App() {
               type="button"
               onPress={openSettingFileDialog}
               variant={"outline"}
+              isDisabled={onClicked}
             >
               設定ファイルを開く
             </Button>
