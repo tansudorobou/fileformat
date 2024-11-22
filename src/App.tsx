@@ -7,7 +7,6 @@ import {
 import { invoke } from "@tauri-apps/api/core"
 import { message, open } from "@tauri-apps/plugin-dialog"
 import { format as fnsFormat } from "date-fns"
-import { se } from "date-fns/locale"
 import { useState } from "react"
 import type { DropEvent, FileDropItem } from "react-aria"
 import { Text } from "react-aria-components"
