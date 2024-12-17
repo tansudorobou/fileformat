@@ -127,6 +127,7 @@ function hookLoader() {
           title: "設定ファイルの読み込み",
           kind: "error",
         })
+        setOnClicked(false)
         return null
       }
 
@@ -167,6 +168,7 @@ function hookLoader() {
           title: "未入力なフォームがあります",
           kind: "info",
         })
+        setOnClicked(false)
         return
       }
 
@@ -197,6 +199,8 @@ function hookLoader() {
           kind: "error",
         })
       }
+    } else {
+      setOnClicked(false)
     }
   }
 
@@ -268,6 +272,8 @@ export default function App() {
     savedDesktopFlag,
     setSavedDesktopFlag,
   } = hookLoader()
+
+  console.log(onClicked)
 
   return (
     <main className="container mx-auto px-4 p-2">
